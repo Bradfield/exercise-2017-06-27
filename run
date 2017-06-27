@@ -1,0 +1,26 @@
+#!/bin/bash
+set -euo pipefail
+IFS=$'\n\t'
+
+# setup app state
+mkdir -p share
+mkdir -p chunks
+[[ -f d.json ]] || echo "{}" > d.json
+
+df=${df:-d.json}
+be=${be:-echo}
+
+# setup gui
+(
+  cd gui
+  mkdir -p tmp
+  [[ -f tmp/main-window-state.json ]] ||
+    echo "{}" > tmp/main-window-state.json
+  npm install
+)
+
+# start backend in background
+$be &
+gui/node_modules/.bin/electron gui
+# when frontend exits, exit here, this will reap backend
+exit

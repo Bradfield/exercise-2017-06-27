@@ -1,0 +1,143 @@
+## manifest
+
+```
+gui/      gui implementation. no need to modify this
+share/    files to share with others on the network
+chunks/   chunks of files your program has fetched
+d.json    what your program knows about files on the network
+          the gui's data source
+e.json    example of the format your program should generate
+run       executable that starts your program and the gui
+```
+
+## guidelines
+
+* you can modify the gui to make it look nicer and add new features, but delay this task until _after_ you've got the backend working
+* create your own application layer protocol. i.e. just use your language's udp socket api. don't start a webserver, don't use ftp, don't start a bittorrent client, don't upload the files to s3, don't use a library that is "great for transferring" files etc. the goal is to learn about network programming by doing this part yourself!
+
+## install
+
+```
+$ git clone https://github.com/bradfield/exercise-2017-06-27
+$ cd exercise-2017-06-27
+```
+
+## uninstall
+
+```
+$ rm -rf exercise-2017-06-27
+```
+
+## usage
+
+### setup
+
+run once with a file to share, a mocked backend, and a mocked data file to check that everything is working.
+
+```
+$ (git config user.name; ifconfig en0 inet) > share/$USER.txt
+$ df=e.json be=echo ./run
+```
+
+in the "shared by others" tab of the ui you should see the files listed in `e.json`
+
+in the "shared by me" tab you should see a file with your username and a `.txt` extension (e.g. `bobsmith.txt`)
+
+the downloads tab should be empty
+
+if that's all working then it's time to write your backend
+
+### write your backend
+
+you can write the backend in any language. but it must support the argv (command line argument) interface and file system interface described below.
+
+to test the gui with your backend set the `be` environment variable to the command that invokes your backend.
+
+if your program was called `backend.py` then you would run
+
+```
+$ be='python backend.py' ./run
+```
+
+in order for your backend to work with the gui it must adhere to the interface described below
+
+when invoked with `peer` as the only command line argument like:
+
+```
+$ python backend.py peer
+```
+
+your program should run in a mode where it periodically attempts to peer the set of shared files on the network and writes that data to `d.json`. in this mode the program should run forever
+
+when a user starts a download from the gui, it will invoke your program like this:
+
+```
+$ python backend.py fetch {file_sha1_hash} {file_name} {file_size} {ip} [other_ips...]
+```
+
+in this mode, your program should fetch the file from one or more of the host(s) given by the `ip` and `other_ips...` parameters
+
+in this "fetching" mode there is technically only one rule this program must follow: _it must not put a partially downloaded file in the `share` folder_. if it does this, everything will break, an alarm will sound and your computer will catch on fire.
+
+however, if you want the "downloads" tab in the gui to show useful information, then your program should represent the fetched data in the following way.
+
+say the user clicked on a file called "hackers.mov", your program will be invoked like
+
+```
+$ python backend.py fetch 3f786850e387550fdab836ed7e6dc881de23001b "hackers.mov" 967632312 10.0.0.4 10.0.0.7
+```
+
+it should immediately create the file `chunks/3f786850e387550fdab836ed7e6dc881de23001b:attrs` who's _contents_ should be
+
+```
+{ "name": "hackers.mov", "size": 967632312 }
+```
+
+then for every partial chunk of the file fetched, it should create a corresponding "chunk file".
+
+for example, if it fetched the first 500 bytes from some host, it should create a file called `chunks/3f786850e387550fdab836ed7e6dc881de23001b:chunk:0` and write the bytes to it. then if it fetched the next 500 bytes (perhaps from another host in parallel to speed up the download!) it should write those bytes to `chunks/3f786850e387550fdab836ed7e6dc881de23001b:chunk:500`.
+
+note the trailing number in the filename is the starting _index_ of the chunk, not the the size of the chunk. because the size of the chunk is just the size of the file.
+
+the gui will notice that these files have been written to disk and update the downloads tab with the progress accordingly.
+
+but this is _all_ that the gui will do. it is up to your program--once it has fetched all the chunks--to:
+
+* concatentate them together
+* check the hash matches the contents
+* write this fully downloaded file to `shared/{filename}`
+* delete the no longer needed chunks
+* exit - in fetch mode your progarm should run until a single file has been fully downloaded (not a single chunk, not multiple files, a single file)
+
+when you kill the gui (or it crashes), it will kill any `peer` and `fetch` processes that it started. when you start it up again, it will re-start the `peer` process, and one fetch process for every `/chunks/chunk:{file_hash}:attrs` file.
+
+this means that running your program in fetch mode with the same arguments should be an idempotent operation.
+
+during development. you do not _need_ to start the gui to test your program, you can invoke directly from the command line using the interface described above. this isolation allows you to distinguish between bugs in the backend and frontend (gui). so before you seek assistance for "a problem with the frontend", run the backend in isolation and test that it's working as expected.
+
+obviously, you can also ask for assistance for problems with the backend :)
+
+as to _how_ peers find each other, share the contents of their `share/` directories with each other, and transfer chunks between each other, that's all up to you and your backend. the frontend is deliberately decoupled from those architectural and implementation decisions.
+
+## troubleshooting
+
+- do you have a recent [node.js] installed? v6.0.0 or older is probably too old
+
+  $ node --version
+
+- dependency install failed?
+
+  $ rm -rf node_modules; ./run
+
+- ui looking weird? clear the temporary state it keeps betweeen restarts
+
+  $ rm gui/tmp
+
+- ensure that d.json is valid json
+
+  $ npm install jsonlint -g
+  $ jsonlint d.json
+
+- chunks corrupted? remove them
+
+  $ rm -rf chunks

@@ -1,0 +1,22 @@
+{
+  "main": "main.js",
+  "author": {
+    "name": "Myles Byrne"
+  },
+  "//name": "app",
+  "//version": "0.0.0",
+  "//description": "",
+  "//scripts": {
+    "start": "electron ."
+  },
+  "//dependencies": {
+    "//electron-debug": "^1.0.0"
+  },
+  "devDependencies": {
+    "devtron": "^1.1.0",
+    "electron": "^1.6.11"
+  },
+  "dependencies": {
+    "yo-yo": "^1.4.1"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "discovered_timestamp": 1498596074226,
+  "discovered_files": [
+    {
+      "sha1": "3f786850e387550fdab836ed7e6dc881de23001b",
+      "size": 967632312,
+      "locations": [
+        { "ip": "10.0.0.4", "filename": "hackers.mov" },
+        { "ip": "10.0.0.7", "filename": "Hackers-1995.mov" }
+      ]
+    },
+    {
+      "sha1": "84da426d75746ac9fce1277043515ade79f4c861",
+      "size": 138,
+      "locations": [
+        { "ip": "10.0.0.4", "filename": "alice.txt" }
+      ]
+    },
+    {
+      "sha1": "6fbf03012a6b76cd731d63c75d81ef344e2b48c6",
+      "size": 152,
+      "locations": [
+        { "ip": "10.0.0.7", "filename": "bob.txt" }
+      ]
+    }
+  ]
+}
