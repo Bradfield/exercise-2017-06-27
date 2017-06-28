@@ -1,10 +1,6 @@
 /* eslint camelcase: 0 */
 
 const yo = require('yo-yo')
-// const path = require('path')
-// const {app} = require('electron').remote
-// const fs = require('fs')
-// const log = (...args) => console.log(...args); log
 
 let state = {}
 let el = view(state)
@@ -12,11 +8,6 @@ document.body.appendChild(el)
 
 Object.assign(state, load_all(), {loaded: true})
 yo.update(el, view(state))
-
-// setTimeout(() => {
-//   state.loaded = true
-//   yo.update(el, view(state))
-// }, 5000)
 
 function view (m) {
   console.log(m)
@@ -27,6 +18,7 @@ function view (m) {
       ? yo`<span>loading...</span>`
       : yo`<div>
         <span>last update from backend ${discovered_timestamp}</span>
+        <br><br>
         <span>available for download</span>
         ${available_for_download_view(available_for_download)}
 
@@ -35,7 +27,26 @@ function view (m) {
 }
 
 function available_for_download_view (xs) {
-  return yo`<span>...</span>`
+  return yo`<div>${xs.map(available_for_download_item)}</div>`
+}
+
+function available_for_download_item (x) {
+  return yo`<div>${x.locations.map((l) =>
+    download_link(Object.assign({}, l, x)))}</div>`
+}
+
+function download_link (x) {
+  let { filename } = x
+  return yo`<span onclick=${() => download_action(x)}>${filename}</span>`
+}
+
+function download_action (x) {
+  let {sha1, size, locations, filename} = x
+  let ips = locations.map((x) => x.ip)
+  let args = [sha1, filename, size].concat(ips)
+  // todo generate command
+  // todo execute command
+  // when finished, update ui
 }
 
 function load_all () {
@@ -43,7 +54,7 @@ function load_all () {
 }
 
 function load_data_file () {
-  // read contents of data file from disk
+  // toto: read contents of data file from disk
   return JSON.parse(`{
     "discovered_timestamp": 1498596074226,
     "discovered_files": [
@@ -74,7 +85,7 @@ function load_data_file () {
 }
 
 function load_share () {
-  // read share dir
+  // todo: read share dir, and stat of each path
   return JSON.parse(`{
     "shared_files": [
       {
@@ -87,7 +98,7 @@ function load_share () {
 }
 
 function load_chunks () {
-  // read chunks dir
+  // read chunks dir, and stat of each path
   return JSON.parse(`{
     "chunks": [
       {
