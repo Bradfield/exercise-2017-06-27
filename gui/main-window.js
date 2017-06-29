@@ -1,52 +1,110 @@
 /* eslint camelcase: 0 */
+/* eslint comma-dangle: ["error", "always-multiline"] */
 
 const yo = require('yo-yo')
+const child_process = require('child_process')
+const fs = require('fs')
 
-let state = {}
-let el = view(state)
-document.body.appendChild(el)
+const inBrowser = typeof document !== 'undefined'
+const isMain = require.main === module
+const state = {}
+const el = yo`<span>loading...</span>`
 
-Object.assign(state, load_all(), {loaded: true})
-yo.update(el, view(state))
+if (inBrowser) {
+  const app = require('electron').remote.app
+  document.title = 'networking exercise'
+  document.body.appendChild(el)
+  Object.assign(state, {
+    data_file_path: app._data_file_path,
+    backend_command: app._backend_command,
+  })
+  console.log(state.data_file_path, load_data_file())
+  Object.assign(state, load_all())
+  yo.update(el, render(state))
+  // todo: watch data file
+  // todo: watch chunks dir
+  // todo: watch shared dir
+} else if (isMain) {
+  process.exit()
+}
 
-function view (m) {
-  console.log(m)
-  let {loaded, discovered_timestamp, discovered_files} = m
-  let available_for_download = discovered_files // subtract shared files
-  return yo`<div>
-    ${!loaded
-      ? yo`<span>loading...</span>`
-      : yo`<div>
-        <span>last update from backend ${discovered_timestamp}</span>
-        <br><br>
-        <span>available for download</span>
-        ${available_for_download_view(available_for_download)}
-
-      </div>`}
+function render (m) {
+  let {discovered_timestamp, discovered_files, shared_files, chunks} = m
+  // todo: subtract shared files from this list
+  let available_for_download = discovered_files
+  return yo`
+  <div>
+    <span>last update from backend: ${new Date(discovered_timestamp)}</span>
+    <h4>available for download</h4>
+    ${available_for_download.map(available_for_download_item)}
+    <h4>transfers</h4>
+    ${chunks.map(transfer_element)}
+    <h4>shared and downloaded</h4>
+    ${shared_files.map(shared_file_element)}
   </div>`
 }
 
-function available_for_download_view (xs) {
-  return yo`<div>${xs.map(available_for_download_item)}</div>`
+function shortsha (s) {
+  return s.slice(0, 7)
 }
 
-function available_for_download_item (x) {
-  return yo`<div>${x.locations.map((l) =>
-    download_link(Object.assign({}, l, x)))}</div>`
+function available_for_download_item (m) {
+  const {sha1, locations, size} = m
+  const locations_with_item = locations.map((x) => Object.assign({}, x, m))
+  return yo`
+  <div>
+    <span style="margin-right: 1em">${shortsha(sha1)}</span>
+    ${join(locations_with_item.map(download_link), yo`<span>, </span>`)}
+    <span>(${size} bytes)</span>
+  </div>`
 }
 
-function download_link (x) {
-  let { filename } = x
-  return yo`<span onclick=${() => download_action(x)}>${filename}</span>`
+function download_link (m) {
+  let { filename } = m
+  let action = () => download_action(m)
+  return yo`
+  <span style="cursor: pointer" onclick=${action}>${filename}</span>`
+}
+
+function join (xs, y) {
+  return xs.reduce((r, x) => r.concat([x, y]), []).slice(0, -1)
+}
+
+function transfer_element (m) {
+  const {filename, size, chunks, sha1} = m
+  return yo`
+  <div>
+    <span style="margin-right: 1em">${shortsha(sha1)}</span>
+    <span>${filename}</span>
+    <span>${percent_complete(chunks, size)}</span>
+    <span>of</span>
+    <span>${size} bytes</span>
+  </div>`
+}
+
+function percent_complete (chunks, length) {
+  let total_chunk_length = chunks.reduce((r, {length}) => r + length, 0)
+  return Math.floor((total_chunk_length / length) * 100).toString() + '%'
 }
 
 function download_action (x) {
   let {sha1, size, locations, filename} = x
   let ips = locations.map((x) => x.ip)
   let args = [sha1, filename, size].concat(ips)
-  // todo generate command
-  // todo execute command
-  // when finished, update ui
+  // backend will mutate fs and we'll respond to that event
+  child_process.spawn(
+    state.backend_command, args, {stdio: 'inherit'})
+}
+
+function shared_file_element (m) {
+  let { filename, size, sha1 } = m
+  return yo`
+  <div>
+    <span style="margin-right: 1em">${shortsha(sha1)}</span>
+    <span>${filename}</span>
+    <span>(${size} bytes)</span>
+  </div>
+  `
 }
 
 function load_all () {
@@ -54,34 +112,7 @@ function load_all () {
 }
 
 function load_data_file () {
-  // toto: read contents of data file from disk
-  return JSON.parse(`{
-    "discovered_timestamp": 1498596074226,
-    "discovered_files": [
-      {
-        "sha1": "3f786850e387550fdab836ed7e6dc881de23001b",
-        "size": 967632312,
-        "locations": [
-          { "ip": "10.0.0.4", "filename": "hackers.mov" },
-          { "ip": "10.0.0.7", "filename": "Hackers-1995.mov" }
-        ]
-      },
-      {
-        "sha1": "84da426d75746ac9fce1277043515ade79f4c861",
-        "size": 138,
-        "locations": [
-          { "ip": "10.0.0.4", "filename": "alice.txt" }
-        ]
-      },
-      {
-        "sha1": "6fbf03012a6b76cd731d63c75d81ef344e2b48c6",
-        "size": 152,
-        "locations": [
-          { "ip": "10.0.0.7", "filename": "bob.txt" }
-        ]
-      }
-    ]
-  }`)
+  return JSON.parse(fs.readFileSync(state.data_file_path, 'utf8'))
 }
 
 function load_share () {
@@ -106,7 +137,8 @@ function load_chunks () {
         "size": 967632312,
         "filename": "hackers.mov",
         "chunks": [
-          { "offset": 0, "length": 5000 }
+          { "offset": 0, "length": 1400 },
+          { "offset": 1400, "length": 96763232 }
         ]
       }
     ]

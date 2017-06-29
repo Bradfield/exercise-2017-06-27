@@ -8,6 +8,9 @@ const url = require('url')
 // Adds debug features like hotkeys for triggering dev tools and reload
 // require('electron-debug')()
 
+app._data_file_path = process.env.dp
+app._backend_command = process.env.be
+
 const main_window_state_path =
   path.join(__dirname, 'tmp/main-window-state.json')
 const main_window_state =
@@ -17,16 +20,14 @@ const main_window_state =
 let win
 
 function createWindow () {
-  // get old dimensions
-  win = new BrowserWindow(main_window_state)
+  win = new BrowserWindow(
+    Object.assign({titleBarStyle: 'hidden'}, main_window_state))
 
   win.loadURL(url.format({
     pathname: path.join(__dirname, 'main-window.html'),
     protocol: 'file:',
     slashes: true
   }))
-
-  // win.webContents.openDevTools()
 
   // when window dimensions change, change state object
   win.on('resize', () => {

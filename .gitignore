@@ -1,6 +1,7 @@
 node_modules
-/scratch.txt
+/scratch
 /share
 /chunks
 /gui/tmp
 /d.json
+

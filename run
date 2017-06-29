@@ -2,16 +2,23 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# setup app state
-mkdir -p share
-mkdir -p chunks
-[[ -f d.json ]] || echo "{}" > d.json
+fast=${fast:-} # optimization
 
 df=${df:-d.json}
+dp=$(ruby -e 'puts File.absolute_path(ARGV[0])' "$df")
 be=${be:-echo}
 
+export dp be
+
+[[ $fast ]] || {
+  # setup app state
+  mkdir -p share
+  mkdir -p chunks
+  [[ -f d.json ]] || echo "{}" > d.json
+}
+
 # setup gui
-(
+[[ $fast ]] || (
   cd gui
   mkdir -p tmp
   [[ -f tmp/main-window-state.json ]] ||
@@ -20,7 +27,7 @@ be=${be:-echo}
 )
 
 # start backend in background
-$be &
+$be peer &
 gui/node_modules/.bin/electron gui
 # when frontend exits, exit here, this will reap backend
 exit
